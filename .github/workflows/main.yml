@@ -1,0 +1,39 @@
+name: Auto Shorts Video Generator
+
+on:
+  workflow_dispatch:  # Cho phép bấm nút "Run workflow" bằng tay trên Github
+  schedule:
+    - cron: '0 0 * * *'  # Tự động chạy mỗi ngày 1 lần vào nửa đêm (tùy chọn)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install System Dependencies (ImageMagick, FFmpeg, Fonts)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y imagemagick ffmpeg fonts-dejavu
+        # Cấu hình lại policy của ImageMagick để cho phép render Text trên Linux
+        sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
+
+    - name: Install Python Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Script
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        IMAGEMAGICK_BINARY: /usr/bin/convert
+      run: |
+        python main.py
