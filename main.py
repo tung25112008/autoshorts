@@ -78,33 +78,41 @@ def parse_vtt(vtt_file):
 
 def generate_video():
     print("3. Đang dựng video với MoviePy...")
-    if not os.path.exists("bg_sample.mp4"):
-        # Download sample background
+    if not os.path.exists("bg_sample.mp4") or os.path.getsize("bg_sample.mp4") < 100000:
         print("Tải video nền mẫu...")
-        response = requests.get("https://cdn.pixabay.com/video/2020/05/25/40141-424908078_tiny.mp4")
-        with open("bg_sample.mp4", "wb") as f:
-            f.write(response.content)
+        try:
+            url = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            with open("bg_sample.mp4", "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        except Exception as e:
+            print(f"Không thể tải video: {e}")
 
     audio = AudioFileClip("audio.mp3")
-    bg_clip = VideoFileClip("bg_sample.mp4").without_audio()
+    try:
+        bg_clip = VideoFileClip("bg_sample.mp4").without_audio()
+        if bg_clip.duration < audio.duration:
+            bg_clip = bg_clip.loop(duration=audio.duration)
+        else:
+            bg_clip = bg_clip.subclip(0, audio.duration)
 
-    if bg_clip.duration < audio.duration:
-        bg_clip = bg_clip.loop(duration=audio.duration)
-    else:
-        bg_clip = bg_clip.subclip(0, audio.duration)
+        w, h = bg_clip.size
+        target_ratio = 9 / 16
+        current_ratio = w / h
 
-    w, h = bg_clip.size
-    target_ratio = 9 / 16
-    current_ratio = w / h
+        if current_ratio > target_ratio:
+            new_w = int(h * target_ratio)
+            bg_clip = crop(bg_clip, width=new_w, height=h, x_center=w/2, y_center=h/2)
+        else:
+            new_h = int(w / target_ratio)
+            bg_clip = crop(bg_clip, width=w, height=new_h, x_center=w/2, y_center=h/2)
 
-    if current_ratio > target_ratio:
-        new_w = int(h * target_ratio)
-        bg_clip = crop(bg_clip, width=new_w, height=h, x_center=w/2, y_center=h/2)
-    else:
-        new_h = int(w / target_ratio)
-        bg_clip = crop(bg_clip, width=w, height=new_h, x_center=w/2, y_center=h/2)
-
-    bg_clip = bg_clip.resize((1080, 1920))
+        bg_clip = bg_clip.resize((1080, 1920))
+    except Exception as e:
+        print(f"Lỗi file video nền: {e}. Sẽ dùng nền màu đen thay thế.")
+        bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=audio.duration)
 
     if platform.system() == "Windows":
         font_name = 'Arial-Bold'
